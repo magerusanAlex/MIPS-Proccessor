@@ -1,0 +1,1 @@
+You are given an interval of numbers (a, b) and a sequence of n numbers. Calculate the sum of the numbers from the sequence that are powers of 2 and fall within the [a, b] interval.

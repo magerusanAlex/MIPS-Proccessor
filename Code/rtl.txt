@@ -1,0 +1,51 @@
+.data
+    # Declaram array-ul in memorie (fiecare numar ocupa 1 word = 4 bytes)
+    x: .word 0, 1, 2, 3, 256, 14, 16
+
+.text
+.globl main
+main:
+    addi $1, $0, 2      # a = 2
+    addi $2, $0, 90     # b = 90
+    addi $3, $0, 7      # n = 7
+    la   $4, x          # base_addr = adresa de inceput a vectorului x
+    add  $5, $0, $0     # sum = 0
+    add  $6, $0, $0     # i = 0
+
+loop_start:
+    slt  $7, $6, $3     # $7 = 1 daca i < n
+    beq  $7, $0, end    # Daca i >= n, am terminat, sarim la 'end'
+
+    # --- CORECTIA DE ADRESA ---
+    # Inmultim indexul 'i' cu 4 pentru ca fiecare cuvant are 4 bytes
+    sll  $9, $6, 2      # $9 = i * 4 (shift left logical cu 2 biti)
+    add  $9, $4, $9     # $9 = adresa elementului curent (base_addr + i * 4)
+    lw   $8, 0($9)      # val = RAM[adresa], citim x[i] in $8
+
+    addi $6, $6, 1      # i = i + 1 (incrementam aici pentru a face 'continue' usor)
+
+    # Verificare: val < a
+    slt  $7, $8, $1     # $7 = 1 daca val < a
+    bne  $7, $0, loop_start # Daca val < a, continue (sarim inapoi la 'loop_start')
+
+    # Verificare: val > b (sau b < val)
+    slt  $7, $2, $8     # $7 = 1 daca b < val
+    bne  $7, $0, loop_start # Daca val > b, continue
+
+    # Verificare: val > 0 (pentru ca val <= 0 sa dea continue)
+    slt  $7, $0, $8     # $7 = 1 daca 0 < val
+    beq  $7, $0, loop_start # Daca val <= 0 ($7 e 0), continue
+
+    # Verificare: este putere a lui 2? (val & (val - 1) == 0)
+    addi $9, $8, -1     # $9 = val - 1
+    and  $9, $8, $9     # $9 = val & (val - 1)
+    bne  $9, $0, loop_start # Daca rezultatul nu e 0, continue
+
+    # Daca a trecut de toate filtrele, adunam la suma
+    add  $5, $5, $8     # sum = sum + val
+    j    loop_start     # Reluam bucla
+
+end:
+    # Oprirea curata a programului (System call pentru exit in MARS/SPIM)
+    addi $v0, $0, 10    # syscall 10 este exit
+    syscall
