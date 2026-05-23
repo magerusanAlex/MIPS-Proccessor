@@ -1,43 +1,42 @@
-# 💻 MIPS 32 Microprocessor (Single-Cycle) in VHDL
+# 💻 MIPS 32 Microprocessor (Single-Cycle & Pipeline)
 
-This repository contains the hardware implementation of a 32-bit Single-Cycle MIPS microprocessor. The project was developed in **VHDL** and validated through synthesis and implementation using the **Xilinx Vivado** environment, ready for testing on an FPGA development board.
+This repository contains the hardware implementation of a 32-bit MIPS microprocessor, developed in **VHDL** and validated on **Artix-7 FPGA** (Nexys A7 board) using **Xilinx Vivado**. The project has evolved from a foundational Single-Cycle architecture to a high-performance 5-stage Pipelined architecture.
 
-## 📌 Project Description
+## 📌 Project Evolution
 
-The processor is capable of fetching, decoding, and executing a core subset of instructions from the MIPS32 architecture. As a hardware validation test, a program (written in machine code) is loaded into the processor's ROM memory, calculating the **sum of numbers that are powers of 2 from a given array, conditionally restricted to the interval $[a, b]$**.
+### Phase 1: Single-Cycle Architecture
+* **Design:** Executes one instruction per clock cycle.
+* **Datapath:** Implements the classic 5-stage execution path (IF, ID, EX, MEM, WB) compressed into a single cycle.
+* **Extension:** The control unit and branch logic were extended to support `bne` (Branch Not Equal) instructions.
 
-### Implemented Instruction Set
-The architecture supports the decoding and execution of the following instructions (R-Type, I-Type, and J-Type):
-* **Arithmetic and logical:** `add`, `and`, `slt`, `sll`, `addi`
-* **Memory access:** `lw`, `sw`
-* **Control flow (Branches/Jumps):** `beq`, `bne`, `j`
+### Phase 2: Pipelined Architecture
+* **Design:** Implements a 5-stage pipeline (IF, ID, EX, MEM, WB) to allow concurrent execution of up to 5 instructions.
+* **Performance:** Significant increase in clock frequency by reducing the critical path through pipeline registers (IF/ID, ID/EX, EX/MEM, MEM/WB).
+* **Hazard Resolution:** * **Data Hazards (RAW):** Resolved via software by inserting `NoOp` (pseudo-instruction `sll $0, $0, 0`) and setting Register File writes on the falling edge of the clock.
+    * **Control Hazards:** Resolved by inserting 3 `NoOp` delay slots for branches and 1 `NoOp` for jumps to prevent pipeline flush errors.
 
-> **Note:** Compared to the classic Single-Cycle MIPS datapath, the control unit and branch address selection logic were custom extended to support the `bne` (Branch Not Equal) instruction.
+## ⚙️ Hardware Architecture Components
 
-## ⚙️ Hardware Architecture
+The design is modular, allowing easy transition between architectures:
 
-The project is modularly structured, with each stage of instruction execution having its dedicated VHDL component:
+* `IFetch.vhd`: Manages the PC and Instruction ROM (contains the test program in machine code).
+* `IDecode.vhd`: Implements the Register File and signal distribution. In the Pipelined version, the `RegDst` MUX was relocated to the `EX` stage to optimize hazard handling.
+* `EX.vhd`: Execution Unit containing the ALU and branch address calculator.
+* `MEM.vhd`: Data Memory unit (RAM) for storage and loading operations.
+* `UC.vhd`: Main Control Unit, decoding opcodes into control signals.
+* `test_env.vhd` (Top-Level): Orchestrates the pipeline stages, instantiates the pipeline registers, and maps inputs (MPG for stepping) and outputs (SSD for status monitoring).
 
-* `IFetch.vhd` (Instruction Fetch) - Manages the Program Counter (PC) and ROM memory.
-* `IDecode.vhd` (Instruction Decode) - Contains the Register File and the sign-extension module.
-* `EX.vhd` (Execution Unit) - Implements the Arithmetic Logic Unit (ALU) and branch address calculation.
-* `MEM.vhd` (Data Memory) - Manages the interface with the RAM data memory.
-* `UC.vhd` (Control Unit) - Decodes the opcode and generates the control signals for the entire datapath.
-* `test_env.vhd` (Top-Level) - Instantiates and interconnects all components above, mapping I/O ports to the FPGA board pins (Buttons, Switches, LEDs, 7-Segment Display).
+## 🚀 Testing Logic
+The processor runs a program designed to solve a conditional accumulation problem:
+1. **Filtering:** Selects numbers within the interval [a, b] that are also powers of 2.
+2. **Execution:** Performs the sum in a loop using `beq`/`bne` for branching.
+3. **Verification:** The sum is stored in memory and displayed on the board's 7-segment display.
 
-## 🚀 Testing Algorithm (Software)
+[Image of MIPS pipeline datapath]
 
-The program natively run by the processor implements the following logic (C++ equivalent):
-```cpp
-int a = 2, b = 90, n = 7;
-int x[] = {0, 1, 2, 3, 256, 14, 16};
-int sum = 0;
-
-for (int i = 0; i < n; i++) {
-    int val = x[i]; 
-    if (val >= a && val <= b && val > 0) {
-        if ((val & (val - 1)) == 0) { // Check power of 2
-            sum += val;
-        }
-    }
-}
+## 🛠 Usage
+1. **Simulation:** Use the provided `test_env` to run behavioral simulations in Vivado. The `MPG` (MonoPulse Generator) component is essential for step-by-step execution to trace signal propagation through pipeline stages.
+2. **FPGA Implementation:**
+    * Program the `.bit` file onto the Nexys A7 board.
+    * Use `btn(0)` to trigger the clock (step-by-step execution).
+    * Use the `sw(7:5)` switches to multiplex different signals (`Instruction`, `RD1`, `ALURes`, etc.) to the 7-segment display for real-time debugging.
